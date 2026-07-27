@@ -14,10 +14,9 @@ Run this file to start the program:
 import tkinter as tk
 from tkinter import ttk
 
-from gamma_exceptions import GammaInputProblem, GammaRangeProblem
+from gamma_exceptions import GammaInputProblem
 from gamma_core import (
-    parse_calculation_lines,
-    run_calculation_lines,
+    evaluate_lines,
     check_accuracy,
 )
 
@@ -209,30 +208,46 @@ class GammaWindow:
     def on_calculate_clicked(self):
         """
         REQ-05/06/10: shows argument+result together, allows repeats,
-        keeps running after invalid input. Also covers REQ-14 (one
-        compare line) and REQ-15 (several compare lines) through the
-        same box, depending on what the user typed.
+        keeps running after invalid input - now per line, not just per
+        session, so one bad line does not hide the good ones around it.
+        Also covers REQ-14 (one compare line) and REQ-15 (several
+        compare lines) through the same box, depending on what the
+        user typed.
         """
         raw_text = self.input_box.get("1.0", "end")
         self.write_to_log("--- Calculate ---")
         try:
-            parsed_rows = parse_calculation_lines(raw_text)
-            report_lines = run_calculation_lines(parsed_rows)
+            line_results = evaluate_lines(raw_text)
         except GammaInputProblem as input_error:
+            # Only raised when there was nothing usable to evaluate at all.
             self.write_to_log(f"Input error: {input_error}", "bad_line")
             return
-        except GammaRangeProblem as range_error:
-            self.write_to_log(f"Calculation error: {range_error}", "bad_line")
-            return
 
-        for line in report_lines:
-            self.write_to_log(line, self._tag_for_line(line))
+        pass_count = 0
+        checked_count = 0
+        error_count = 0
 
-        if len(report_lines) > 1:
-            pass_count = sum(1 for line in report_lines if "[PASS]" in line)
-            checked_count = sum(1 for line in report_lines if "[PASS]" in line or "[FAIL]" in line)
-            if checked_count:
-                self.write_to_log(f"Summary: {pass_count} of {checked_count} checks passed.")
+        for line_number, message, status in line_results:
+            if status == "error":
+                error_count += 1
+                self.write_to_log(message, "bad_line")
+            elif status == "pass":
+                pass_count += 1
+                checked_count += 1
+                self.write_to_log(message, "good_line")
+            elif status == "fail":
+                checked_count += 1
+                self.write_to_log(message, "bad_line")
+            else:
+                self.write_to_log(message, "normal_line")
+
+        summary_parts = []
+        if checked_count:
+            summary_parts.append(f"{pass_count} of {checked_count} checks passed")
+        if error_count:
+            summary_parts.append(f"{error_count} line(s) had errors")
+        if summary_parts:
+            self.write_to_log("Summary: " + "; ".join(summary_parts) + ".")
 
     def on_clear_clicked(self):
         """Empty the input box for a fresh set of lines."""
