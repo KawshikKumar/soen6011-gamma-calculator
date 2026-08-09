@@ -24,7 +24,8 @@ def _log_series_near_one(value):
     """
     Natural log of a number close to 1.
 
-    ln(value) = 2 * (w + w^3/3 + w^5/5 + ...), w = (value - 1) / (value + 1).
+    ln(value) = 2 * (w + w^3/3 + w^5/5 + ...),
+    with w = (value - 1) / (value + 1).
     """
     w = (value - 1.0) / (value + 1.0)
     w_squared = w * w
@@ -44,7 +45,9 @@ _TWO_STEP_LOG = _log_series_near_one(2.0)
 def homemade_ln(value):
     """Natural logarithm of a strictly positive number."""
     if value <= 0.0:
-        raise GammaRangeProblem("Cannot take a logarithm of a non-positive number.")
+        raise GammaRangeProblem(
+            "Cannot take a logarithm of a non-positive number."
+        )
 
     doubling_count = 0
     shrunk_value = value
@@ -56,7 +59,8 @@ def homemade_ln(value):
         shrunk_value *= 2.0
         doubling_count -= 1
 
-    return _log_series_near_one(shrunk_value) + doubling_count * _TWO_STEP_LOG
+    near_one_part = _log_series_near_one(shrunk_value)
+    return near_one_part + doubling_count * _TWO_STEP_LOG
 
 
 def homemade_exp(value):
@@ -82,7 +86,9 @@ def homemade_exp(value):
     while squaring_count < halving_steps:
         result *= result
         if result > UPPER_SAFE_LIMIT:
-            raise GammaRangeProblem("This result is too large for the calculator to store.")
+            raise GammaRangeProblem(
+                "This result is too large for the calculator to store."
+            )
         squaring_count += 1
 
     if negative_input:
