@@ -5,6 +5,8 @@ Concordia University
 
 Assigned transcendental function: **F4 — Γ(x), the Gamma function**
 
+Current version: **1.1.0** (Semantic Versioning; see `gamma_version.py`)
+
 ## What this is
 
 A Gamma-function calculator built for **Cooper Brand**, a fictional
@@ -31,13 +33,14 @@ correctness before being relied on.
 
 | File | Responsibility |
 |---|---|
+| `gamma_version.py` | Single source of the Semantic Version number, read by the GUI and mirrored in this README. |
 | `gamma_exceptions.py` | Two custom exception types: `GammaInputProblem` (bad user input) and `GammaRangeProblem` (a result too large to store). |
 | `gamma_math_tools.py` | From-scratch `homemade_ln`, `homemade_exp`, and `size_of` (our own `abs`), plus the π constant used by the Lanczos formula. No `math` module import. |
 | `gamma_core.py` | The Lanczos approximation itself (`gamma_from_scratch`), the fixed REQ-11 accuracy check (`check_accuracy`), and `evaluate_lines`, which parses and computes one or more user-typed lines independently, line by line. |
 | `gamma_gui.py` | The Tkinter GUI. Run this file to start the program. |
+| `tests/` | The `unittest` (PyUnit) suite added in D3/Problem 8. |
 
-There is no single "main" file separate from the GUI — `gamma_gui.py`
-is the entry point.
+`gamma_gui.py` is the entry point for the current implementation.
 
 ## How to run it
 
@@ -45,12 +48,11 @@ Requires Python 3 with Tkinter (included in the standard Python
 installer on Windows and macOS; on Linux, install with
 `sudo apt install python3-tk` if it's missing).
 
-1. Place all four `.py` files in the same folder.
-2. From that folder, run:
+From the repository folder:
 
-   ```bash
-   python gamma_gui.py
-   ```
+```bash
+python3 gamma_gui.py
+```
 
 No IDE, build step, or external package is required.
 
@@ -59,17 +61,58 @@ No IDE, build step, or external package is required.
 The left-hand box accepts one or more lines. Each line is either:
 
 - **a single positive number** — calculates Γ(x) and displays it
-  (e.g. `4.5`)
+  (e.g. `4.5`, or `2e-3` in scientific notation)
 - **`argument, expected_value`** — calculates Γ(argument) *and*
   compares it against `expected_value`, reporting a relative error and
   a PASS/FAIL verdict (e.g. `4.5, 11.6317`)
 
-Multiple lines can be mixed freely. Clicking **Calculate** evaluates
-every line independently — a mistake on one line is reported on that
-line only and does not stop the other lines from still being
-calculated. The **Run accuracy check** button separately verifies the
-calculator against a fixed, previously-approved set of reference
-values (unrelated to whatever is currently typed in the input box).
+Multiple lines can be mixed freely. **Calculate** (or Ctrl+Enter)
+evaluates every line independently — a mistake on one line is reported
+on that line only and does not stop the other lines from still being
+calculated. **Clear input** (or Escape) empties the input box and
+deliberately leaves the session log intact. The **Run accuracy check**
+button separately verifies the calculator against a fixed,
+previously-approved set of reference values (unrelated to whatever is
+currently typed in the input box).
+
+Every log line begins with a word — `RESULT`, `PASS`, `FAIL` or
+`ERROR` — and the status line under the log repeats the outcome in
+plain words, so no outcome is carried by colour alone.
+
+## Semantic Versioning
+
+The project follows `MAJOR.MINOR.PATCH`:
+
+- **MAJOR** — an incompatible change to how the calculator is used
+- **MINOR** — new behaviour that does not break existing use
+- **PATCH** — a correction that does not break existing use
+
+`1.0.0` is the D2/Problem 5 state (from-scratch Lanczos calculation,
+Tkinter GUI, custom exceptions, REQ-01 to REQ-15). `1.1.0` is the
+D3/Problem 7 state: the calculation is untouched, while the interface
+gains keyboard operation, a textual status line, readable defaults and
+a visible version — new behaviour that breaks nothing, so MINOR moves
+up and PATCH resets to 0.
+
+## Code quality (D3/Problem 7)
+
+The commands used against the current implementation and its tests:
+
+```bash
+python3 -m flake8 .
+python3 -m pylint gamma_version.py gamma_exceptions.py \
+    gamma_math_tools.py gamma_core.py gamma_gui.py tests
+python3 -m pdb gamma_core.py
+```
+
+## Unit tests (D3/Problem 8)
+
+The suite uses Python's built-in `unittest` framework (PyUnit). From
+the repository folder:
+
+```bash
+python3 -m unittest discover -v
+```
 
 ## Requirement traceability
 
@@ -109,7 +152,8 @@ D2/Problem 7 based on what D2/Problem 5's implementation added.
 from-scratch constraint intact), and `gamma_from_scratch` was checked
 against the same approved test dataset used for REQ-11
 (Γ(1), Γ(5), Γ(4.5), Γ(170)), all within ~1e-12 to 1e-13 relative
-error — well inside the 1e-6 requirement.
+error — well inside the 1e-6 requirement. As of D3, the same values
+are covered by the automated `unittest` suite in `tests/`.
 
 ## References
 
@@ -125,3 +169,5 @@ error — well inside the 1e-6 requirement.
   Stories," 2013.
 - Zaninetti, L., "The Luminosity Function of Galaxies as Modelled by
   the Generalized Gamma Distribution," arXiv:1004.4776, 2010.
+- Python Software Foundation, PEP 8 — Style Guide for Python Code.
+- Preston-Werner, T., Semantic Versioning 2.0.0.
