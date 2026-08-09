@@ -1,14 +1,19 @@
 """
 Core Gamma-function logic for the calculator.
 
-Rebuilds the Lanczos approximation using only homemade_ln / homemade_exp
-instead of Python's math module. One parser (evaluate_lines) covers
-three cases per line: a plain argument, or an argument with an expected
-value to compare against.
+Rebuilds the Lanczos approximation using only homemade_ln /
+homemade_exp instead of Python's math module. One parser
+(evaluate_lines) covers two cases per line: a plain argument, or an
+argument with an expected value to compare against.
 """
 
 from gamma_exceptions import GammaInputProblem, GammaRangeProblem
-from gamma_math_tools import homemade_ln, homemade_exp, size_of, CIRCLE_RATIO
+from gamma_math_tools import (
+    CIRCLE_RATIO,
+    homemade_exp,
+    homemade_ln,
+    size_of,
+)
 
 # Lanczos g=7, n=9 coefficient table (Lanczos, 1964; Press et al.,
 # Numerical Recipes, 3rd ed., section 6.1).
@@ -25,6 +30,10 @@ LANCZOS_TABLE = (
     1.5056327351493116e-7,
 )
 LANCZOS_TERM_COUNT = 9
+
+# REQ-11: the largest relative error the calculator is allowed to
+# show against a known-correct value.
+ACCURACY_TOLERANCE = 1e-6
 
 # Approved test dataset for REQ-11.
 REFERENCE_VALUES = (
@@ -55,7 +64,9 @@ def gamma_from_scratch(argument):
     coefficient_total = LANCZOS_TABLE[0]
     position = 1
     while position < LANCZOS_TERM_COUNT:
-        coefficient_total += LANCZOS_TABLE[position] / (base_argument + position)
+        coefficient_total += (
+            LANCZOS_TABLE[position] / (base_argument + position)
+        )
         position += 1
 
     scaled_base = base_argument + LANCZOS_SHIFT + 0.5
@@ -77,19 +88,23 @@ def format_with_digits(value, digit_count=7):
 
 
 def _relative_gap(computed_value, expected_value):
-    """Relative error between a computed value and an expected value."""
+    """Relative error between a computed value and an expected
+    value."""
     if expected_value == 0.0:
         return size_of(computed_value - expected_value)
-    return size_of(computed_value - expected_value) / size_of(expected_value)
+    return (
+        size_of(computed_value - expected_value)
+        / size_of(expected_value)
+    )
 
 
 def check_accuracy():
-    """REQ-11: compare our result to the fixed, approved test dataset."""
+    """REQ-11: compare our result to the fixed, approved dataset."""
     report_lines = []
     for test_argument, expected_value in REFERENCE_VALUES:
         computed_value = gamma_from_scratch(test_argument)
         gap = _relative_gap(computed_value, expected_value)
-        verdict = "PASS" if gap <= 1e-6 else "FAIL"
+        verdict = "PASS" if gap <= ACCURACY_TOLERANCE else "FAIL"
         report_lines.append(
             f"Gamma({format_with_digits(test_argument)}) = "
             f"{format_with_digits(computed_value)}  "
@@ -106,25 +121,61 @@ def _parse_one_line(trimmed_line):
     for _ in pieces:
         piece_count += 1
 
-    if piece_count != 1 and piece_count != 2:
-        raise GammaInputProblem("use 'argument' or 'argument, expected_value'.")
+    if piece_count not in (1, 2):
+        raise GammaInputProblem(
+            "use 'argument' or 'argument, expected_value'."
+        )
 
     try:
         row_argument = float(pieces[0].strip())
-        row_expected = float(pieces[1].strip()) if piece_count == 2 else None
+        if piece_count == 2:
+            row_expected = float(pieces[1].strip())
+        else:
+            row_expected = None
     except ValueError as parse_error:
-        raise GammaInputProblem("values must be numbers, such as 4.5 or 2e-3.") from parse_error
+        raise GammaInputProblem(
+            "values must be numbers, such as 4.5 or 2e-3."
+        ) from parse_error
 
     if _is_unusable_number(row_argument):
-        raise GammaInputProblem("infinity and NaN are not supported as an argument.")
+        raise GammaInputProblem(
+            "infinity and NaN are not supported as an argument."
+        )
 
     if row_argument <= 0.0:
-        raise GammaInputProblem("the argument must be greater than zero.")
+        raise GammaInputProblem(
+            "the argument must be greater than zero."
+        )
 
     if row_expected is not None and _is_unusable_number(row_expected):
-        raise GammaInputProblem("infinity and NaN are not supported as a reference value.")
+        raise GammaInputProblem(
+            "infinity and NaN are not supported as a reference value."
+        )
 
     return row_argument, row_expected
+
+
+def _describe_plain_result(row_argument, computed_value):
+    """Message for a line that only asked for a Gamma value."""
+    return (
+        f"Gamma({format_with_digits(row_argument)}) = "
+        f"{format_with_digits(computed_value)}"
+    )
+
+
+def _describe_comparison(row_argument, computed_value, row_expected):
+    """Message and status for a line that supplied a reference
+    value."""
+    gap = _relative_gap(computed_value, row_expected)
+    status = "pass" if gap <= ACCURACY_TOLERANCE else "fail"
+    verdict = "PASS" if status == "pass" else "FAIL"
+    message = (
+        f"Gamma({format_with_digits(row_argument)}) = "
+        f"{format_with_digits(computed_value)}  vs your "
+        f"{format_with_digits(row_expected)}  "
+        f"(relative error {gap:.2e}) [{verdict}]"
+    )
+    return message, status
 
 
 def evaluate_lines(raw_text):
@@ -151,31 +202,32 @@ def evaluate_lines(raw_text):
             row_argument, row_expected = _parse_one_line(trimmed_line)
             computed_value = gamma_from_scratch(row_argument)
         except GammaInputProblem as input_error:
-            line_results.append((line_number, f"Line {line_number}: {input_error}", "error"))
+            line_results.append(
+                (line_number, f"Line {line_number}: {input_error}",
+                 "error")
+            )
             continue
         except GammaRangeProblem as range_error:
-            line_results.append((line_number, f"Line {line_number}: {range_error}", "error"))
+            line_results.append(
+                (line_number, f"Line {line_number}: {range_error}",
+                 "error")
+            )
             continue
 
         if row_expected is None:
-            message = (
-                f"Gamma({format_with_digits(row_argument)}) = "
-                f"{format_with_digits(computed_value)}"
+            message = _describe_plain_result(
+                row_argument, computed_value
             )
             line_results.append((line_number, message, "ok"))
         else:
-            gap = _relative_gap(computed_value, row_expected)
-            status = "pass" if gap <= 1e-6 else "fail"
-            verdict = "PASS" if status == "pass" else "FAIL"
-            message = (
-                f"Gamma({format_with_digits(row_argument)}) = "
-                f"{format_with_digits(computed_value)}  vs your "
-                f"{format_with_digits(row_expected)}  "
-                f"(relative error {gap:.2e}) [{verdict}]"
+            message, status = _describe_comparison(
+                row_argument, computed_value, row_expected
             )
             line_results.append((line_number, message, status))
 
     if not saw_any_content:
-        raise GammaInputProblem("Please enter at least one argument before calculating.")
+        raise GammaInputProblem(
+            "Please enter at least one argument before calculating."
+        )
 
     return line_results
